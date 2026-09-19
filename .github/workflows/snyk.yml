@@ -1,0 +1,68 @@
+name: Snyk Security Scan (Snyk CLI)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  snyk-cli:
+    runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Snyk CLI
+        run: |
+          npm install -g snyk
+          snyk --version
+          snyk config get api || true
+
+      - name: Snyk Open Source test (all projects)
+        # continue-on-error so SARIF still uploads; final gate step fails the job on vulns
+        continue-on-error: true
+        run: snyk test --all-projects --severity-threshold=low --sarif-file-output=snyk-opensource.sarif
+
+      - name: Snyk Code test
+        continue-on-error: true
+        run: snyk code test --severity-threshold=low --sarif-file-output=snyk-code.sarif
+
+      - name: Upload Snyk Open Source SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-opensource.sarif
+          category: snyk-opensource
+
+      - name: Upload Snyk Code SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+          category: snyk-code
+
+      - name: Snyk fail-on-high gate (Open Source + Code)
+        # This is the enforcing step: exits 1 if high+ vulns found, so PRs / pushes fail visibly
+        run: |
+          snyk test --all-projects --severity-threshold=high
+          snyk code test --severity-threshold=high
