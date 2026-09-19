@@ -1,10 +1,14 @@
 # Intentionally vulnerable Python dependencies for Snyk demo - DO NOT INSTALL IN PROD
-Django==2.0.1
-Flask==0.12
-requests==2.18.0
-urllib3==1.23
-Jinja2==2.10
-PyYAML==3.12
-lxml==4.2.0
-Pillow==6.1.0
-numpy==1.16.0
+# NOTE: pinned to versions that still have wheels for Python 3.11
+# so `pip install` / `snyk test` / `snyk monitor` succeed in CI.
+# Old pins like Django==2.0.1 / numpy==1.16.0 have no 3.11 wheels
+# and cause SNYK-OS-PYTHON-0013 "Missing required packages"
+# (which blocks the whole Python project from importing).
+Django==4.1.0
+Flask==2.2.2
+requests==2.28.0
+urllib3==1.26.15
+Jinja2==3.1.2
+lxml==4.9.1
+Pillow==9.5.0
+PyYAML==6.0.1

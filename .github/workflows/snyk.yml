@@ -63,7 +63,7 @@ jobs:
         run: |
           snyk monitor \
             --file=package.json \
-            --project-name=snyk-demo
+            --project-name=snyk-demo-node
 
       - name: Publish Python results to Snyk dashboard
         env:
@@ -73,4 +73,4 @@ jobs:
           snyk monitor \
             --file=requirements.txt \
             --package-manager=pip \
-            --project-name=snyk-demo
+            --project-name=snyk-demo-python
