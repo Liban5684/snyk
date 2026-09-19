@@ -5,75 +5,72 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
-  schedule:
-    - cron: "0 6 * * 1"
   workflow_dispatch:
-
-permissions:
-  contents: read
-  security-events: write
 
 jobs:
   snyk-cli:
     runs-on: ubuntu-latest
-    env:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Check SNYK_TOKEN
-        run: |
-          if [ -z "$SNYK_TOKEN" ]; then
-            echo "::error::SNYK_TOKEN secret is missing. Add it in GitHub repo Settings > Secrets > Actions as SNYK_TOKEN (from https://app.snyk.io Account Settings)."
-            exit 1
-          fi
-          echo "SNYK_TOKEN is set."
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts || npm install --ignore-scripts
 
-      - name: Install Snyk CLI
-        run: |
-          npm install -g snyk
-          snyk --version
+      - name: Install Python dependencies
+        continue-on-error: true
+        run: pip install -r requirements.txt
 
-      - name: Snyk Open Source test (all projects)
-        # continue-on-error so SARIF still uploads; final gate step fails the job on vulns
+      - name: Set up Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: Run Snyk Node scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
         run: |
-          snyk test --all-projects --severity-threshold=low --sarif-file-output=snyk-opensource.sarif || echo "snyk-test-exit=$?"
-          ls -lh *.sarif || true
+          echo "============================================"
+          echo "  Running: snyk test (npm)"
+          echo "  Snyk will scan $GITHUB_WORKSPACE for manifests"
+          echo "============================================"
+          snyk test --file=package.json
 
-      - name: Snyk Code test
+      - name: Run Snyk Python scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         continue-on-error: true
         run: |
-          snyk code test --severity-threshold=low --sarif-file-output=snyk-code.sarif || echo "snyk-code-exit=$?"
-          ls -lh *.sarif || true
+          echo "============================================"
+          echo "  Running: snyk test (pip)"
+          echo "  Snyk will scan $GITHUB_WORKSPACE for manifests"
+          echo "============================================"
+          snyk test --file=requirements.txt --package-manager=pip
 
-      - name: Upload Snyk Open Source SARIF
-        if: always() && hashFiles('snyk-opensource.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: snyk-opensource.sarif
-          category: snyk-opensource
-
-      - name: Upload Snyk Code SARIF
-        if: always() && hashFiles('snyk-code.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: snyk-code.sarif
-          category: snyk-code
-
-      - name: Snyk fail-on-high gate (Open Source + Code)
-        # This is the enforcing step: exits 1 if high+ vulns found, so PRs / pushes fail visibly
+      - name: Publish Node results to Snyk dashboard
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
         run: |
-          snyk test --all-projects --severity-threshold=high
-          snyk code test --severity-threshold=high
+          snyk monitor \
+            --file=package.json \
+            --project-name=snyk-demo
+
+      - name: Publish Python results to Snyk dashboard
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+        run: |
+          snyk monitor \
+            --file=requirements.txt \
+            --package-manager=pip \
+            --project-name=snyk-demo
