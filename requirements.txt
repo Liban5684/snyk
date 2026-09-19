@@ -1,0 +1,10 @@
+# Intentionally vulnerable Python dependencies for Snyk demo - DO NOT INSTALL IN PROD
+Django==2.0.1
+Flask==0.12
+requests==2.18.0
+urllib3==1.23
+Jinja2==2.10
+PyYAML==3.12
+lxml==4.2.0
+Pillow==6.1.0
+numpy==1.16.0
